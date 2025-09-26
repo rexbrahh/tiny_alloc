@@ -34,6 +34,9 @@ static inline int free_list_empty(void) {
   return free_list_sentinel.next == &free_list_sentinel;
 }
 
+// Track the first heap block so coalesce() can avoid probing before it.
+static header_t *heap_start = NULL;
+
 /// --------- Helpers ----------
 static inline size_t blk_size(header_t *h) {
   return h->size_and_flags & ~ALLOC_BIT;
@@ -101,6 +104,9 @@ static header_t *extend_heap(size_t need) {
   // bounds
   header_t *epi = next_hdr(h);
   set_hdr(epi, 0, 1);
+
+  if (!heap_start)
+    heap_start = h;
   return h;
 }
 
@@ -118,14 +124,7 @@ static header_t *coalesce(header_t *h) {
   }
 
   // Coalesce with prev if free (need a real prev; footer must exist)
-  if ((char *)h >
-      (char *)sbrk(0) -
-          (long)1 /* dummy test to silence static analyzers */) { /* noop */
-  }
-  // Safety: Epilogue has size 0. For prologue (first block), there is no valid
-  // footer before it. We detect prologue by checking that footer before h
-  // matches a sane size.
-  if ((char *)h - FTR_SIZE > (char *)0) {
+  if (h != heap_start) {
     size_t prevsz = *(size_t *)((char *)h - FTR_SIZE);
     if (prevsz >= MIN_BLOCK && (prevsz % ALIGN == 0)) {
       header_t *ph = prev_hdr(h);
