@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 /// --------- Tunables / Macros ----------
 #define ALIGN 16UL
@@ -93,8 +94,8 @@ static header_t *extend_heap(size_t need) {
   size_t req = (need < (size_t)pagesz ? (size_t)pagesz : need);
   req = ALIGN_UP(req);
 
-  void *p = sbrk(req);
-  if (p == (void *)-1)
+  void *p = mmap(NULL, req, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (p == MAP_FAILED)
     return NULL;
 
   header_t *h = (header_t *)p;
